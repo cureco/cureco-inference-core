@@ -1,0 +1,50 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cureco-inference-core"
+version = "0.1.0"
+description = "Cureco学習プラットフォーム用ONNX推論エンジン"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "Cureco Ltd.", email = "oss@cureco.co.jp" },
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+]
+dependencies = [
+    "onnxruntime>=1.16.0",
+    "numpy>=1.24.0",
+    "Pillow>=9.0.0",
+]
+
+[project.optional-dependencies]
+gpu = ["onnxruntime-gpu>=1.16.0"]
+directml = ["onnxruntime-directml>=1.16.0"]
+docs = [
+    "mkdocs-material",
+    "mkdocstrings[python]",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+]
+
+[project.urls]
+Documentation = "https://github.com/cureco/cureco-inference-core"
+Repository = "https://github.com/cureco/cureco-inference-core"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cureco_inference_core"]

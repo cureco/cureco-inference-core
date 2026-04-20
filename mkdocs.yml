@@ -1,0 +1,61 @@
+site_name: Cureco Inference ドキュメント
+site_description: Cureco学習プラットフォーム用ONNX推論パッケージのドキュメント
+
+theme:
+  name: material
+  language: ja
+  palette:
+    - scheme: default
+      primary: blue
+      toggle:
+        icon: material/brightness-7
+        name: ダークモード
+    - scheme: slate
+      primary: blue
+      toggle:
+        icon: material/brightness-4
+        name: ライトモード
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths:
+            - src
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            members_order: source
+            merge_init_into_class: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            separate_signature: true
+            signature_crossrefs: true
+
+nav:
+  - ホーム: index.md
+  - チュートリアル:
+      - クイックスタート: tutorial/quickstart.md
+      - Execution Provider: tutorial/providers.md
+      - カスタム推論タイプの追加: tutorial/custom-inference.md
+  - APIリファレンス:
+      - CurecoInference: api/core.md
+      - 型定義: api/types.md
+      - 推論タイプ:
+          - InferenceBase: api/inferences/base.md
+          - InferenceClassification: api/inferences/classification.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
