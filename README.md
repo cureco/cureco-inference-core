@@ -68,3 +68,27 @@ print(classes)  # ['cat', 'dog', 'bird']
 ## ライセンス
 
 MIT
+
+
+## 異常検知モジュール（PatchCore-lite・良品学習のみ）
+
+`pip install cureco-inference-core[anomaly]`（torch / torchvision）で、
+**アノテーション不要・良品画像のみ・エッジ内で数分**の異常検知が使えます
+（filament-inspect からの寄贈。実測は同リポジトリ docs/REPORT.md）。
+
+```python
+from cureco_inference_core.anomaly import PatchCoreLite
+
+judge = PatchCoreLite(weights_path="wrn50_backbone.pt")  # オフライン環境は重みを同梱
+judge.fit(normal_crops)          # (N,96,96) グレー or (N,96,96,3) BGR カラー
+judge.calibrate_dense(images)    # 全面スキャン（画像単位OK/NG）を使う場合
+judge.save("bank.pt")            # バンク＝モデルファイル
+
+scores, maps = judge.score_crops(crops)              # パッチ判定
+tiles, origins = judge.tile_image(image)             # 全面スキャン用タイル分割
+judge.absorb(fp_crops)                               # 誤検出を良品として即時追記（再学習不要）
+```
+
+教師あり分類（ONNX）とはモデル形式が異なるため独立モジュールです。
+クラウド学習を経由せず**完全オフラインで学習が完結**する点が製品ライン上の役割
+（Cureco AI Edge の「欠陥を見つける」プロファイル）。
