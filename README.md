@@ -74,7 +74,7 @@ MIT
 
 `pip install cureco-inference-core[anomaly]`（torch / torchvision）で、
 **アノテーション不要・良品画像のみ・エッジ内で数分**の異常検知が使えます
-（filament-inspect からの寄贈。実測は同リポジトリ docs/REPORT.md）。
+（cureco-edge の検出コアの実体。実測は同リポジトリ docs/REPORT.md）。
 
 ```python
 from cureco_inference_core.anomaly import PatchCoreLite
@@ -85,8 +85,10 @@ judge.calibrate_dense(images)    # 全面スキャン（画像単位OK/NG）を�
 judge.save("bank.pt")            # バンク＝モデルファイル
 
 scores, maps = judge.score_crops(crops)              # パッチ判定
-tiles, origins = judge.tile_image(image)             # 全面スキャン用タイル分割
-judge.absorb(fp_crops)                               # 誤検出を良品として即時追記（再学習不要）
+tiles, origins = judge.tile_image(image)             # 全面スキャン用タイル分割（dense_stride で重なり可）
+judge.absorb(fp_crops, tag=7)                        # 誤検出を良品として即時追記（再学習不要）
+judge.register_defect(fn_crops, tag=7)               # 見逃しをNG見本として登録（少数ショット）
+judge.forget(7)                                      # 訂正のアンドゥ（由来タグで行単位に取消）
 ```
 
 教師あり分類（ONNX）とはモデル形式が異なるため独立モジュールです。
