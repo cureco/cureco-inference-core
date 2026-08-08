@@ -85,6 +85,24 @@ print(metadata.keys())
 
 これらの静的メソッドはグラフ最適化を無効化しCPUのみで実行するため、`load_model` よりも大幅に高速です。
 
+!!! warning "メタデータの値はすべてJSONエンコードされています"
+    ONNXの `metadata_props` は値に文字列しか持てないため、Curecoの書き出し側は
+    辞書・数値・文字列を区別せず一律 `json.dumps` して書き込みます。
+    `read_metadata` が返すのは**生のまま**の値なので、利用側で `json.loads` してください。
+
+    ```python
+    import json
+
+    metadata = CurecoInference.read_metadata("model.onnx")
+    print(metadata['dataset_type'])              # '"classification"' ← 引用符込み
+    print(json.loads(metadata['dataset_type']))  # 'classification'
+    ```
+
+    素の文字列で書き出さないのは型を保つためです。素で書くと、`"20260420"` のような
+    数字だけのデータセット名が読み取り時に整数 `20260420` になってしまいます。
+    `read_classes` と `load_model` は内部でこのデコードを済ませているため、
+    利用側で意識する必要はありません。
+
 ## モデル情報の確認
 
 ```python

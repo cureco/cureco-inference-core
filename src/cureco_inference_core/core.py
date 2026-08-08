@@ -19,6 +19,45 @@ from typing import List, Dict, Optional, Any
 logger = logging.getLogger(__name__)
 
 
+def _decode_metadata_value(key: str, raw: Any) -> Any:
+    """ONNXメタデータの値を1つデコードする。
+
+    **規約: ONNXメタデータの値は「すべて」JSONエンコードされている。**
+
+    ONNXの `metadata_props` は値に文字列しか持てないため、メタデータの値は
+    辞書・数値・文字列を区別せず `json.dumps` で書き込む。
+    したがって読む側は「すべての値を `json.loads`
+    して読む」。素の文字列として扱うと、
+
+      - `dataset_type` は `'"classification"'`（引用符込み）になり、
+        `== 'classification'` の比較が**必ず外れる**
+      - 逆に書き出し側が素の文字列で書くと、`dataset_name = "20260420"` のような
+        数字だけの名前が読み取り時に**整数 20260420 になってしまう**
+
+    という食い違いが起きる。一律JSONにすることで型が保たれる。
+
+    規約に従っていない値（古いモデルや手作りのモデル）は、警告を出したうえで
+    生の値をそのまま返す。ここで例外を投げると推論そのものが止まってしまい、
+    害のほうが大きいため。
+
+    Args:
+        key: メタデータのキー名（警告メッセージ用）。
+        raw: `custom_metadata_map` から取り出した生の値。
+
+    Returns:
+        デコード済みの値。デコードできなかった場合は生の値。
+    """
+    try:
+        return json.loads(raw)
+    except (TypeError, ValueError):
+        logger.warning(
+            f"ONNXメタデータ '{key}' がJSONとして読めません。"
+            f"メタデータの値はすべてJSONエンコードされている必要があります。"
+            f"生の値をそのまま使います: {raw!r}"
+        )
+        return raw
+
+
 class CurecoInference:
     """ONNX推論エンジン。
 
@@ -84,17 +123,27 @@ class CurecoInference:
         self._onnx_session = onnxruntime.InferenceSession(model_path, providers=providers)
         custom_metadata = self._onnx_session.get_modelmeta().custom_metadata_map
 
-        augmentations_str = custom_metadata.get('augmentations', '{}')
-        preprocessing_str = custom_metadata.get('preprocessing', '{}')
-        idx_to_class_str = custom_metadata.get('idx_to_class', '{}')
-        label_slugs_str = custom_metadata.get('label_slugs', '{}')
-        model_type = custom_metadata.get('dataset_type')
+        # メタデータの値はすべてJSONエンコードされている（`_decode_metadata_value` 参照）。
+        # 辞書として使う項目は、規約違反で辞書にならなかった場合も空辞書として推論を続ける。
+        decoded = {}
+        for key in ('augmentations', 'preprocessing', 'idx_to_class', 'label_slugs'):
+            value = _decode_metadata_value(key, custom_metadata.get(key, '{}'))
+            if not isinstance(value, dict):
+                logger.warning(f"ONNXメタデータ '{key}' が辞書ではありません。空として扱います。")
+                value = {}
+            decoded[key] = value
 
-        self._augmentations = json.loads(augmentations_str)
-        self._preprocessing = json.loads(preprocessing_str)
-        self._idx_to_class = json.loads(idx_to_class_str)
-        self._label_slugs = json.loads(label_slugs_str)
-        self._model_type = model_type
+        self._augmentations = decoded['augmentations']
+        self._preprocessing = decoded['preprocessing']
+        self._idx_to_class = decoded['idx_to_class']
+        self._label_slugs = decoded['label_slugs']
+        # `dataset_type` も同じ規約でJSONエンコードされている（実物の値は '"classification"'）。
+        # 生のまま比較するとモデルタイプの判定が必ず外れるので、必ずデコードしてから持つ。
+        raw_model_type = custom_metadata.get('dataset_type')
+        self._model_type = (
+            '' if raw_model_type is None
+            else str(_decode_metadata_value('dataset_type', raw_model_type))
+        )
 
         self._model_inputs = self._get_inputs()
         self._model_outputs = self._get_outputs()
@@ -116,14 +165,17 @@ class CurecoInference:
 
         Raises:
             RuntimeError: モデルがロードされていない場合。
+            NotImplementedError: 未対応のモデルタイプ（物体検出等）の場合。
         """
-        if self.model_type == 'classification':
-            inference = InferenceClassification(self._idx_to_class, self._preprocessing, self._model_inputs, self._model_outputs)
-        elif self.model_type == 'detection':
-            # inference = InferenceDetection()
-            pass
-        else:
-            inference = InferenceClassification(self._idx_to_class, self._preprocessing, self._model_inputs, self._model_outputs)
+        if self.model_type == 'detection':
+            # 物体検出は未実装。ここを素通りさせると `inference` が未定義のまま使われ、
+            # 分かりにくい UnboundLocalError になるので、はっきり断る。
+            raise NotImplementedError(
+                "物体検出モデルには対応していません（この版は画像分類のみ対応）。"
+                "dataset_type が 'classification' のモデルを指定してください。"
+            )
+        # メタデータを持たない古いモデルは model_type が空になる。従来どおり分類として扱う。
+        inference = InferenceClassification(self._idx_to_class, self._preprocessing, self._model_inputs, self._model_outputs)
 
         input_data = inference.preprocess(image, params)
         output_data = self._onnx_session.run(None, input_data)
@@ -181,11 +233,17 @@ class CurecoInference:
         グラフ最適化を無効化しCPUのみでセッションを作成するため、
         `load_model` よりも高速です。
 
+        !!! warning "値はすべてJSONエンコードされています"
+            返すのは ONNX に格納された**生のまま**の値です。ONNXメタデータの値は
+            すべて `json.dumps` された文字列なので（`dataset_type` は
+            `'"classification"'`、`num_classes` は `'6'`）、利用側で `json.loads`
+            してから使ってください。理由は `_decode_metadata_value` の説明を参照。
+
         Args:
             model_path: ONNXモデルファイルのパス。
 
         Returns:
-            メタデータのキー・値辞書。
+            メタデータのキー・値辞書（値はJSON文字列のまま）。
         """
         opts = onnxruntime.SessionOptions()
         opts.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_DISABLE_ALL
