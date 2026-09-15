@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType><TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
+    <AssemblyName>CurecoInference</AssemblyName><ApplicationManifest>app.manifest</ApplicationManifest>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Cureco.Inference" Version="0.1.0" GeneratePathProperty="true" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" GeneratePathProperty="true" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <Target Name="CopyRuntimeNotices" AfterTargets="Publish">
+    <ItemGroup><RuntimeNotice Include="$(PkgCureco_Inference)/licenses/*" /></ItemGroup>
+    <Error Condition="'@(RuntimeNotice)' == ''" Text="Native runtime license notices are required for distribution." />
+    <Copy SourceFiles="@(RuntimeNotice)" DestinationFolder="$(PublishDir)/licenses" />
+    <ItemGroup>
+      <FrameworkNotice Include="%(ResolvedRuntimePack.PackageDirectory)/LICENSE*;%(ResolvedRuntimePack.PackageDirectory)/THIRD-PARTY-NOTICES*">
+        <Group>%(ResolvedRuntimePack.NuGetPackageId)</Group>
+      </FrameworkNotice>
+      <ProtectedDataNotice Include="$(PkgSystem_Security_Cryptography_ProtectedData)/LICENSE*;$(PkgSystem_Security_Cryptography_ProtectedData)/THIRD-PARTY-NOTICES*" />
+    </ItemGroup>
+    <Error Condition="'$(SelfContained)' == 'true' and '@(FrameworkNotice)' == ''" Text="Framework runtime notices are required for self-contained distribution." />
+    <Copy SourceFiles="@(FrameworkNotice)" DestinationFiles="@(FrameworkNotice->'$(PublishDir)/licenses/%(Group)/%(Filename)%(Extension)')" />
+    <Copy SourceFiles="@(ProtectedDataNotice)" DestinationFolder="$(PublishDir)/licenses/System.Security.Cryptography.ProtectedData" />
+  </Target>
+</Project>

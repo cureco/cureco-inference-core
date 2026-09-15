@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <PackageId>Cureco.Inference</PackageId>
+    <Version>0.1.0</Version>
+    <Description>Cureco inference C ABI v1 wrapper. Requires the matching native SDK.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(CurecoNativeRuntimeDir)' != '' and '$(RuntimeIdentifier)' != ''">
+    <None Include="$(CurecoNativeRuntimeDir)/*.dll;$(CurecoNativeRuntimeDir)/*.so*" Pack="true" PackagePath="runtimes/$(RuntimeIdentifier)/native/" />
+    <None Include="$(CurecoNativeRuntimeDir)/../licenses/*" Pack="true" PackagePath="licenses/" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="README.md" />
+  </ItemGroup>
+  <Target Name="ValidateNativePackage" BeforeTargets="GenerateNuspec">
+    <Error Condition="'$(CurecoNativeRuntimeDir)' == '' or '$(RuntimeIdentifier)' == ''" Text="Packaging requires a native runtime directory and target RID." />
+    <Error Condition="!Exists('$(CurecoNativeRuntimeDir)/cureco_inference.dll') and !Exists('$(CurecoNativeRuntimeDir)/libcureco_inference.so')" Text="Cureco native library is missing." />
+    <Error Condition="!Exists('$(CurecoNativeRuntimeDir)/onnxruntime.dll') and !Exists('$(CurecoNativeRuntimeDir)/libonnxruntime.so')" Text="ONNX Runtime library is missing." />
+    <Error Condition="!Exists('$(CurecoNativeRuntimeDir)/../licenses/cureco-LICENSE') or !Exists('$(CurecoNativeRuntimeDir)/../licenses/onnxruntime-LICENSE') or !Exists('$(CurecoNativeRuntimeDir)/../licenses/onnxruntime-ThirdPartyNotices.txt') or !Exists('$(CurecoNativeRuntimeDir)/../licenses/nlohmann-json-LICENSE.MIT')" Text="Native dependency license notices are required." />
+  </Target>
+</Project>

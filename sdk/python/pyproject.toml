@@ -1,0 +1,61 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cureco-inference-core"
+version = "0.1.0"
+description = "Python bindings for the Cureco native ONNX inference SDK"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "Cureco Ltd.", email = "oss@cureco.co.jp" },
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+]
+dependencies = [
+    "numpy>=1.24.0",
+    "Pillow>=9.0.0",
+]
+
+[project.optional-dependencies]
+docs = [
+    "mkdocs-material",
+    "mkdocstrings[python]",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+    "onnx>=1.16",
+    "onnxruntime>=1.16",
+]
+
+[project.urls]
+Documentation = "https://github.com/cureco/cureco-inference-core"
+Repository = "https://github.com/cureco/cureco-inference-core"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cureco_inference_core"]
+
+[tool.hatch.build.targets.wheel.hooks.custom]
+path = "hatch_build.py"
+
+[tool.hatch.build.targets.sdist]
+exclude = ["dist", "build", ".venv"]
+
+[project.entry-points.pyinstaller40]
+hook-dirs = "cureco_inference_core._pyinstaller:get_hook_dirs"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

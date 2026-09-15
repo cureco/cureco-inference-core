@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.24)
+project(cureco_c_example LANGUAGES C)
+find_package(Cureco CONFIG REQUIRED)
+add_executable(cureco_c_example main.c)
+target_link_libraries(cureco_c_example PRIVATE Cureco::cureco_inference)

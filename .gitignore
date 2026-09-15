@@ -13,3 +13,17 @@ venv/
 htmlcov/
 site/
 .mypy_cache/
+sdk/native/runtime/
+sdk/native/runtime.zip
+bin/
+obj/
+.vs/
+*.user
+*.suo
+*.pfx
+*.p12
+*.key
+.env
+.env.*
+artifacts/
+deps/

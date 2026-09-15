@@ -1,0 +1,60 @@
+<Window x:Class="Cureco.InferenceApp.MainWindow"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ Title="Cureco Inference" Width="1160" Height="860" MinWidth="900" MinHeight="650" FontSize="14" Background="#E8EDF3">
+ <Window.Resources>
+  <Style TargetType="Button"><Setter Property="Padding" Value="14,9"/><Setter Property="Margin" Value="0,4,8,4"/><Setter Property="Background" Value="#F4F7FB"/><Setter Property="BorderBrush" Value="#AAB8CB"/><Setter Property="Foreground" Value="#20334E"/><Setter Property="Cursor" Value="Hand"/></Style>
+  <Style TargetType="TextBlock"><Setter Property="Foreground" Value="#26374F"/></Style>
+  <Style TargetType="CheckBox"><Setter Property="Margin" Value="0,8"/><Setter Property="Foreground" Value="#26374F"/></Style>
+ </Window.Resources>
+ <DockPanel>
+  <Border DockPanel.Dock="Top" Background="#1C2C48" Padding="28,20">
+   <StackPanel><TextBlock Text="CURECO  /  INFERENCE" Foreground="White" FontSize="24" FontWeight="SemiBold"/><TextBlock Text="モデルを読み込み、画像から結果を確認" Foreground="#C3D2E9" Margin="0,7,0,0"/></StackPanel>
+  </Border>
+  <Border DockPanel.Dock="Bottom" Background="#DCE4EE" BorderBrush="#AAB8CB" BorderThickness="0,1,0,0" Padding="22,12">
+   <TextBlock x:Name="Status" Text="モデルを選択してください" TextWrapping="Wrap"/>
+  </Border>
+  <Grid Margin="20">
+   <Grid.ColumnDefinitions><ColumnDefinition Width="310"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+   <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel>
+     <Border Background="#F7F9FC" BorderBrush="#AAB8CB" BorderThickness="1" CornerRadius="8" Padding="18">
+      <StackPanel x:Name="Actions">
+       <TextBlock Text="1  モデル" FontSize="18" FontWeight="SemiBold"/>
+       <Button Content="ONNXモデルを開く…" Click="OpenModel"/>
+       <TextBlock x:Name="ModelName" Text="未選択" TextWrapping="Wrap" Margin="0,4,0,16"/>
+       <TextBlock Text="2  画像" FontSize="18" FontWeight="SemiBold"/>
+       <Button Content="画像を開く…" Click="OpenImage"/>
+       <TextBlock x:Name="ImageName" Text="PNG / JPEG / BMP" TextWrapping="Wrap" Margin="0,4,0,12"/>
+       <Button Content="推論を実行" Click="RunInference" Background="#3155A0" Foreground="White" FontWeight="SemiBold"/>
+       <UniformGrid Columns="2"><Button Content="JSON保存" ToolTip="推論結果とマスクを保存" Click="SaveJson"/><Button Content="PNG保存" ToolTip="表示画像を保存" Click="SavePng"/></UniformGrid>
+      </StackPanel>
+     </Border>
+     <Border Background="#F0F4FA" BorderBrush="#AAB8CB" BorderThickness="1" CornerRadius="8" Padding="18" Margin="0,16,0,0">
+      <StackPanel x:Name="ServerControls">
+       <TextBlock Text="ローカル推論API" FontSize="18" FontWeight="SemiBold"/>
+       <TextBlock Text="127.0.0.1 のみ・Bearer認証" Margin="0,6,0,12"/>
+       <TextBlock Text="ポート"/>
+       <TextBox x:Name="Port" Padding="8" Margin="0,4,0,4" Text="8765"/>
+       <CheckBox x:Name="AutoServer" Content="アプリ起動時にAPIを開始"/>
+       <CheckBox x:Name="Minimized" Content="GUIを最小化して起動"/>
+       <Button Content="起動設定を保存" Click="SaveSettings"/>
+       <Button x:Name="ServerButton" Content="APIを開始" Click="ToggleServer"/>
+       <Button Content="APIトークンをコピー" Click="CopyToken"/>
+       <TextBlock x:Name="ServerStatus" Text="停止中" TextWrapping="Wrap" Margin="0,8,0,0"/>
+      </StackPanel>
+     </Border>
+    </StackPanel>
+   </ScrollViewer>
+   <Grid Grid.Column="2">
+    <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="180"/></Grid.RowDefinitions>
+    <Border Background="#D3DCE8" BorderBrush="#91A3BB" BorderThickness="1" CornerRadius="8" Padding="12">
+     <Grid><TextBlock x:Name="EmptyHint" Text="画像のプレビュー" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="20" Foreground="#52657F"/><Image x:Name="Preview" Stretch="Uniform"/></Grid>
+    </Border>
+    <Border Grid.Row="1" Background="#F7F9FC" BorderBrush="#AAB8CB" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,14,0,0">
+     <DockPanel><TextBlock DockPanel.Dock="Top" Text="推論結果" FontWeight="SemiBold" Margin="0,0,0,8"/><TextBox x:Name="ResultText" IsReadOnly="True" Background="Transparent" BorderThickness="0" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" FontFamily="Consolas"/></DockPanel>
+    </Border>
+   </Grid>
+  </Grid>
+ </DockPanel>
+</Window>

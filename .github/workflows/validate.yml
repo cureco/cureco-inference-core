@@ -1,0 +1,81 @@
+name: Public SDK and app validation
+on:
+  workflow_dispatch:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  windows-cpu:
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Check public source
+        run: python .github/scripts/public_source.py
+      - name: Fetch public build dependencies
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          python -m pip install pytest onnx numpy Pillow
+          New-Item -ItemType Directory -Force deps/json/nlohmann | Out-Null
+          Invoke-WebRequest https://github.com/microsoft/onnxruntime/releases/download/v1.22.1/onnxruntime-win-x64-1.22.1.zip -OutFile deps/ort.zip
+          Expand-Archive deps/ort.zip deps
+          Invoke-WebRequest https://raw.githubusercontent.com/nlohmann/json/v3.12.0/single_include/nlohmann/json.hpp -OutFile deps/json/nlohmann/json.hpp
+          Invoke-WebRequest https://raw.githubusercontent.com/nlohmann/json/v3.12.0/LICENSE.MIT -OutFile deps/json-LICENSE.MIT
+      - name: Build and package native SDK
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          cmake -S sdk/native -B build/native -A x64 "-DONNXRUNTIME_ROOT=$pwd/deps/onnxruntime-win-x64-1.22.1" "-DCURECO_JSON_INCLUDE_DIR=$pwd/deps/json"
+          cmake --build build/native --config Release --parallel 2
+          python sdk/native/package.py --build-dir build/native --ort-root deps/onnxruntime-win-x64-1.22.1 --json-license deps/json-LICENSE.MIT --target win-x64 --output sdk/native/runtime
+          python -m pip wheel --no-deps ./sdk/python -w dist/wheels
+          python -m pip install --no-deps (Get-ChildItem dist/wheels/*.whl).FullName
+          dotnet pack sdk/csharp/Cureco.Inference/Cureco.Inference.csproj -c Release -o dist/nuget -p:RuntimeIdentifier=win-x64 "-p:CurecoNativeRuntimeDir=$pwd/sdk/native/runtime/bin"
+      - name: Build consumers against packages
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          cmake -S examples/c/minimal -B build/c -A x64 "-DCMAKE_PREFIX_PATH=$pwd/sdk/native/runtime"
+          cmake --build build/c --config Release
+          cmake -S examples/cpp/minimal -B build/cpp -A x64 "-DCMAKE_PREFIX_PATH=$pwd/sdk/native/runtime"
+          cmake --build build/cpp --config Release
+          New-Item -ItemType Directory -Force build/examples | Out-Null
+          Copy-Item build/c/Release/*.exe, build/cpp/Release/*.exe, sdk/native/runtime/bin/*.dll build/examples
+          dotnet build examples/csharp/minimal/Minimal.csproj -c Release -r win-x64 "-p:RestoreAdditionalProjectSources=$pwd/dist/nuget"
+          dotnet build sdk/csharp/Cureco.Inference.Tests/Cureco.Inference.Tests.csproj -c Release -r win-x64 "-p:RestoreAdditionalProjectSources=$pwd/dist/nuget"
+          dotnet build examples/csharp/inference-app/tests/InferenceApp.Tests.csproj -c Release -r win-x64 "-p:RestoreAdditionalProjectSources=$pwd/dist/nuget"
+      - name: Test packaged SDK and app
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $env:CURECO_EXAMPLES_DIR = "$pwd/build/examples"
+          $env:CURECO_DOTNET_SMOKE = "$pwd/examples/csharp/minimal/bin/Release/net8.0/win-x64/Minimal.dll"
+          python tests/integration/test_sdk.py build/fixtures
+          python -m pytest tests/integration sdk/python/tests -q
+          $env:PATH = "$pwd/sdk/native/runtime/bin;" + $env:PATH
+          ctest --test-dir build/native -C Release --output-on-failure
+          python examples/python/minimal/infer.py build/fixtures/classification.onnx build/fixtures/image.png
+          dotnet sdk/csharp/Cureco.Inference.Tests/bin/Release/net8.0/win-x64/Cureco.Inference.Tests.dll build/fixtures/classification.onnx
+          dotnet examples/csharp/inference-app/tests/bin/Release/net8.0-windows/win-x64/InferenceApp.Tests.dll build/fixtures
+      - name: Produce unsigned review artifacts
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          dotnet publish examples/csharp/inference-app/src/InferenceApp.csproj -c Release -r win-x64 --self-contained true -o dist/app "-p:RestoreAdditionalProjectSources=$pwd/dist/nuget"
+          dotnet examples/csharp/inference-app/tests/bin/Release/net8.0-windows/win-x64/InferenceApp.Tests.dll build/fixtures dist/app/CurecoInference.exe
+          Compress-Archive -Path dist/app/* -DestinationPath dist/CurecoInference-win-x64-unsigned.zip
+          python .github/scripts/public_source.py --archive dist/cureco-inference-source.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reviewed-build-inputs-win-x64-unsigned
+          path: |
+            dist/*.zip
+            dist/wheels/*.whl
+            dist/nuget/*.nupkg
+            sdk/native/runtime.zip

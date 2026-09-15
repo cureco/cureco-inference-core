@@ -1,0 +1,32 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "native-release",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/native-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "ONNXRUNTIME_ROOT": "$env{ONNXRUNTIME_ROOT}",
+        "CURECO_JSON_INCLUDE_DIR": "$env{CURECO_JSON_INCLUDE_DIR}"
+      }
+    },
+    {
+      "name": "linux-arm64-cross",
+      "inherits": "native-release",
+      "binaryDir": "${sourceDir}/build/linux-arm64-cross",
+      "toolchainFile": "${sourceDir}/cmake/linux-arm64.cmake"
+    },
+    {
+      "name": "jetson-orin",
+      "inherits": "native-release",
+      "binaryDir": "${sourceDir}/build/jetson-orin",
+      "description": "Run ON the Orin or matching ARM64 JetPack SDK container; supply matching CUDA/TensorRT-enabled ORT SDK"
+    }
+  ],
+  "buildPresets": [
+    { "name": "native-release", "configurePreset": "native-release" },
+    { "name": "linux-arm64-cross", "configurePreset": "linux-arm64-cross" },
+    { "name": "jetson-orin", "configurePreset": "jetson-orin" }
+  ]
+}
