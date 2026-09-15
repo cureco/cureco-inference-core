@@ -3,10 +3,11 @@
 .NET 8以降。Cureco.Inferenceは共通ネイティブSDKを呼ぶバインディングです。
 
 ```xml
-<PackageReference Include="Cureco.Inference" Version="0.1.0" />
+<PackageReference Include="Cureco.Inference" Version="0.2.0" />
 ```
 
 対象RIDのランタイムを含むNuGetを選びます。ローカル配布物を使う例:
+GitHub ReleasesのCureco.Inference.0.2.0.nupkgをソースZIP展開先のdist/nugetフォルダーに置いて実行します。
 
 ```sh
 dotnet restore examples/csharp/minimal/Minimal.csproj -r win-x64 --source ./dist/nuget --source https://api.nuget.org/v3/index.json

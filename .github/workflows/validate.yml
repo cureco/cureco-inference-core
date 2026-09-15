@@ -68,8 +68,8 @@ jobs:
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
           dotnet publish examples/csharp/inference-app/src/InferenceApp.csproj -c Release -r win-x64 --self-contained true -o dist/app "-p:RestoreAdditionalProjectSources=$pwd/dist/nuget"
-          dotnet examples/csharp/inference-app/tests/bin/Release/net8.0-windows/win-x64/InferenceApp.Tests.dll build/fixtures dist/app/CurecoInference.exe
-          Compress-Archive -Path dist/app/* -DestinationPath dist/CurecoInference-win-x64-unsigned.zip
+          dotnet examples/csharp/inference-app/tests/bin/Release/net8.0-windows/win-x64/InferenceApp.Tests.dll build/fixtures dist/app/InferenceApp.exe
+          Compress-Archive -Path dist/app/* -DestinationPath dist/InferenceApp-win-x64-unsigned.zip
           python .github/scripts/public_source.py --archive dist/cureco-inference-source.zip
       - uses: actions/upload-artifact@v4
         with:

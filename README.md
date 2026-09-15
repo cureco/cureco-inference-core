@@ -10,7 +10,9 @@ ONNXモデルを組み込むための推論SDKと、実行形式でも使えるC
 | C#へ組み込む | [C# SDK](docs/sdk/csharp.md) |
 | ソースからビルドする | [ビルドと配布](docs/building/README.md) |
 
-新しい配布構成は開発中です。記載の配布物がレジストリやReleaseに公開済みであることは意味しません。
+配布物は[GitHub Releases](https://github.com/cureco/cureco-inference-core/releases)から取得してください。
+アプリZIPは署名なしです。Windowsの発行元確認・警告については[利用手順](docs/inference-app/README.md)を確認してください。
+wheel・NuGetもRelease添付ファイルから取得します。PyPI/NuGet.orgで同じバージョンが公開されているとは限りません。
 初期検証対象はWindows x64 / CPUです。他のOS・アクセラレータは対象環境で検証後に対応を明示します。
 
 ## 構成

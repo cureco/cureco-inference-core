@@ -10,9 +10,9 @@ public static class Program
         try
         {
             if (args.Length == 1 && args[0] == "--serve") return ServeAsync().GetAwaiter().GetResult();
-            if (args.Length != 0) throw new ArgumentException("Usage: CurecoInference.exe [--serve]");
+            if (args.Length != 0) throw new ArgumentException("Usage: InferenceApp.exe [--serve]");
             var application = new Application();
-            application.Run(new MainWindow(Settings.Load()));
+            application.Run(new MainWindow(Settings.Load().EnsureToken()));
             return 0;
         }
         catch (Exception error)
@@ -23,13 +23,13 @@ public static class Program
                 Directory.CreateDirectory(folder);
                 File.WriteAllText(Path.Combine(folder, "startup-error.log"), DateTimeOffset.Now + "\n" + error.Message);
             }
-            else MessageBox.Show(error.Message, "Cureco Inference", MessageBoxButton.OK, MessageBoxImage.Error);
+            else MessageBox.Show(error.Message, "Inference", MessageBoxButton.OK, MessageBoxImage.Error);
             return 1;
         }
     }
     static async Task<int> ServeAsync()
     {
-        var settings = Settings.Load();
+        var settings = Settings.Load().EnsureToken();
         using var session = new InferenceSession(settings.ModelPath);
         using var stop = new CancellationTokenSource();
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; stop.Cancel(); };

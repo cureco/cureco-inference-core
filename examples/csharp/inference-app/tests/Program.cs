@@ -9,6 +9,30 @@ using Cureco.InferenceApp;
 
 static void Check(bool value, string message) { if (!value) throw new Exception(message); }
 if (args.Length is < 1 or > 2) throw new ArgumentException("Pass generated ONNX fixtures and optionally the published app executable");
+string? originalSettingsDirectory = Environment.GetEnvironmentVariable("CURECO_INFERENCE_SETTINGS_DIR");
+string tokenTestDirectory = Path.Combine(Path.GetFullPath(args[0]), "token-settings-" + Guid.NewGuid().ToString("N"));
+try
+{
+    Environment.SetEnvironmentVariable("CURECO_INFERENCE_SETTINGS_DIR", tokenTestDirectory);
+    var initial = Settings.Load().EnsureToken();
+    string firstToken = initial.Token();
+    Check(firstToken.Length == 64, "Initial token missing");
+    Check(Settings.Load().EnsureToken().Token() == firstToken, "Token changed after restart");
+    Check(!File.ReadAllText(Path.Combine(tokenTestDirectory, "settings.json")).Contains(firstToken), "Token saved as plaintext");
+    var configured = initial with { ModelPath = "example.onnx", Port = 9000, StartMinimized = true };
+    configured.Save();
+    var rotated = Settings.Load().RegenerateToken();
+    Check(rotated.Token() != firstToken && rotated.Token().Length == 64, "Token was not regenerated");
+    Check(Settings.Load().EnsureToken().Token() == rotated.Token(), "Regenerated token was not persisted");
+    Check(rotated.ModelPath == configured.ModelPath && rotated.Port == 9000 && rotated.StartMinimized, "Token rotation changed startup settings");
+    Environment.SetEnvironmentVariable("CURECO_INFERENCE_SETTINGS_DIR", Path.Combine(tokenTestDirectory, "settings.json", "invalid"));
+    try { rotated.RegenerateToken(); throw new Exception("Saved token to invalid directory"); }
+    catch (IOException) { }
+    Environment.SetEnvironmentVariable("CURECO_INFERENCE_SETTINGS_DIR", tokenTestDirectory);
+    Check(Settings.Load().Token() == rotated.Token(), "Failed save changed persisted token");
+    Console.WriteLine("PASS: automatic token persistence, explicit regeneration, settings preservation and save failure");
+}
+finally { Environment.SetEnvironmentVariable("CURECO_INFERENCE_SETTINGS_DIR", originalSettingsDirectory); }
 var bitmap = BitmapSource.Create(2, 2, 96, 96, PixelFormats.Rgb24, null,
     new byte[] { 255,0,0, 255,0,0, 255,0,0, 255,0,0 }, 6);
 var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
@@ -89,7 +113,7 @@ var ui = new Thread(() =>
     try
     {
         var application = new System.Windows.Application();
-        var window = new MainWindow(new Settings());
+        var window = new MainWindow(new Settings().WithToken(token));
         window.Loaded += (_, _) => window.Dispatcher.BeginInvoke(new Action(window.Close));
         application.Run(window);
     }

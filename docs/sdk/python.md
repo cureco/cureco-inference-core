@@ -4,7 +4,7 @@ Python 3.10以降。対象OSの配布wheelにネイティブランタイムが�
 以下はローカル配布物を使用する例です。
 
 ```sh
-python -m pip install ./cureco_inference_core-0.1.0-py3-none-win_amd64.whl
+python -m pip install ./cureco_inference_core-0.2.0-py3-none-win_amd64.whl
 python examples/python/minimal/infer.py model.onnx image.png
 ```
 

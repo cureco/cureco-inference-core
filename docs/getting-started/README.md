@@ -2,7 +2,7 @@
 
 ## アプリ
 
-検証済みのWindows x64アプリZIPを展開してCurecoInference.exeを実行します。
+検証済みのWindows x64アプリZIPを展開してInferenceApp.exeを実行します。
 DLLを含むフォルダ全体を保持してください。PythonやVisual Studioは不要です。
 モデルと画像を選び「推論を実行」を押します。[詳細](../inference-app/README.md)
 

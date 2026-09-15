@@ -20,6 +20,13 @@ public sealed record Settings
         : new Settings();
     public Settings WithToken(string token) => this with { ProtectedToken = Convert.ToBase64String(ProtectedData.Protect(Encoding.UTF8.GetBytes(token), null, DataProtectionScope.CurrentUser)) };
     public string Token() => ProtectedToken.Length == 0 ? "" : Encoding.UTF8.GetString(ProtectedData.Unprotect(Convert.FromBase64String(ProtectedToken), null, DataProtectionScope.CurrentUser));
+    public Settings EnsureToken() => ProtectedToken.Length == 0 ? RegenerateToken() : this;
+    public Settings RegenerateToken()
+    {
+        var updated = WithToken(Convert.ToHexString(RandomNumberGenerator.GetBytes(32)));
+        updated.Save();
+        return updated;
+    }
     public void Save()
     {
         if (Port < 1024 || Port > 65535) throw new ArgumentException("Port must be 1024–65535");

@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.IO;
-using System.Security.Cryptography;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Media.Imaging;
@@ -11,7 +10,7 @@ namespace Cureco.InferenceApp;
 public partial class MainWindow : Window
 {
     Settings settings;
-    readonly string token;
+    string token;
     InferenceSession? session;
     ApiServer? server;
     DecodedImage? image;
@@ -25,7 +24,6 @@ public partial class MainWindow : Window
         InitializeComponent();
         this.settings = settings;
         token = settings.Token();
-        if (token.Length == 0) token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
         Port.Text = settings.Port.ToString();
         AutoServer.IsChecked = settings.StartServer;
         Minimized.IsChecked = settings.StartMinimized;
@@ -117,6 +115,17 @@ public partial class MainWindow : Window
     async void CopyToken(object sender, RoutedEventArgs e) => await Work(() =>
     {
         Clipboard.SetText(token); Status.Text = "APIトークンをコピーしました。共有・公開しないでください。";
+        return Task.CompletedTask;
+    });
+    async void RegenerateToken(object sender, RoutedEventArgs e) => await Work(() =>
+    {
+        if (server != null) throw new InvalidOperationException("トークンを再発行する前にAPIを停止してください。");
+        if (MessageBox.Show(this, "以前のトークンは使えなくなります。APIを呼び出すプログラムの設定も更新してください。再発行しますか？",
+            "APIトークンの再発行", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
+            return Task.CompletedTask;
+        settings = settings.RegenerateToken();
+        token = settings.Token();
+        Status.Text = "APIトークンを再発行して保存しました。";
         return Task.CompletedTask;
     });
     async void SaveJson(object sender, RoutedEventArgs e) => await Work(async () =>

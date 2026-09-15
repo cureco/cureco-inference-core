@@ -1,4 +1,4 @@
-# Cureco Inference app
+# Inference app
 
 C# WPFによるSDK利用例です。InferenceApp.slnをVisual Studioで開いてください。
 Cureco.Inference NuGetを参照し、SDKソースを直接参照しません。
