@@ -9,6 +9,10 @@ on:
         description: Existing release tag (for example v0.2.0)
         required: true
         type: string
+      verify_only:
+        description: Verify without publishing
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -77,6 +81,7 @@ jobs:
 
   publish-test:
     needs: verify
+    if: ${{ !inputs.verify_only }}
     runs-on: ubuntu-latest
     environment:
       name: testpypi
