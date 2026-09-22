@@ -6,11 +6,17 @@
 <PackageReference Include="Cureco.Inference.Core" Version="0.2.0" />
 ```
 
-対象RIDのランタイムを含むNuGetを選びます。ローカル配布物を使う例:
-配布されたCureco.Inference.Core.0.2.0.nupkgをソースZIP展開先のdist/nugetフォルダーに置いて実行します。
+NuGet.orgからインストールできます。プロジェクトのフォルダーで実行します。
 
 ```sh
-dotnet restore examples/csharp/minimal/Minimal.csproj -r win-x64 --source ./dist/nuget --source https://api.nuget.org/v3/index.json
+dotnet add package Cureco.Inference.Core
+```
+
+Visual Studioでは「NuGetパッケージの管理」で `Cureco.Inference.Core` を検索します。
+ネイティブランタイムはパッケージに含まれます。最小サンプルの実行例:
+
+```sh
+dotnet restore examples/csharp/minimal/Minimal.csproj -r win-x64
 dotnet run --project examples/csharp/minimal/Minimal.csproj -c Release -r win-x64 -- model.onnx image.rgb 640 480
 ```
 

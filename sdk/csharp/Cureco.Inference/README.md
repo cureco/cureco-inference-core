@@ -3,6 +3,10 @@
 C# bindings to the shared native inference SDK. This package is not a second inference engine.
 Use a package containing the native runtime for your target RID (initial validation: win-x64).
 
+```sh
+dotnet add package Cureco.Inference.Core
+```
+
 ```csharp
 using Cureco.Inference;
 using var engine = new Engine("model.onnx");
