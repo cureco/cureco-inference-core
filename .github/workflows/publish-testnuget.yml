@@ -1,0 +1,166 @@
+name: Publish CSharp SDK to TestNuGet
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag (for example v0.2.0)
+        required: true
+        type: string
+      verify_only:
+        description: Verify without publishing
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-testnuget
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: github.event_name == 'workflow_dispatch' || github.event.release.prerelease
+    runs-on: windows-2022
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.event.release.tag_name }}
+      GH_TOKEN: ${{ github.token }}
+      NUGET_PACKAGES: ${{ github.workspace }}/verify-packages
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download release packages
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          if ($env:RELEASE_TAG -notmatch '^v\d+\.\d+\.\d+(?:(?:a|b|rc)\d+)?$') { throw 'Expected version tag' }
+          $release = gh release view $env:RELEASE_TAG --json isDraft | ConvertFrom-Json
+          if ($release.isDraft) { throw 'Expected published release' }
+          gh release download $env:RELEASE_TAG --pattern 'Cureco.Inference.Core.*.nupkg' --pattern '*-py3-none-win_amd64.whl' --pattern SHA256SUMS.txt --dir dist
+      - name: Verify package identity, checksums and native runtime
+        run: |
+          @'
+          import hashlib
+          import os
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          import zipfile
+          checksums = dict(line.split(maxsplit=1)[::-1] for line in Path('dist/SHA256SUMS.txt').read_text().splitlines() if line.strip())
+          checksums = {name.lstrip('*'): digest for name, digest in checksums.items()}
+          packages = list(Path('dist').glob('*.nupkg'))
+          wheels = list(Path('dist').glob('*.whl'))
+          assert len(packages) == len(wheels) == 1
+          for path in packages + wheels:
+              assert hashlib.sha256(path.read_bytes()).hexdigest() == checksums[path.name], path.name
+          with zipfile.ZipFile(packages[0]) as archive:
+              names = archive.namelist()
+              root = ET.fromstring(archive.read(next(n for n in names if n.endswith('.nuspec'))))
+              assert root.find('.//{*}metadata/{*}id').text == 'Cureco.Inference.Core'
+              assert root.find('.//{*}metadata/{*}version').text == os.environ['RELEASE_TAG'][1:]
+              for name in ('lib/net8.0/Cureco.Inference.dll', 'runtimes/win-x64/native/cureco_inference.dll', 'runtimes/win-x64/native/onnxruntime.dll', 'licenses/cureco-LICENSE', 'licenses/onnxruntime-LICENSE', 'licenses/onnxruntime-ThirdPartyNotices.txt', 'licenses/nlohmann-json-LICENSE.MIT'):
+                  assert name in names, name
+          print('Verified:', packages[0].name)
+          '@ | python -
+      - name: Test packaged SDK
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          python -m pip install pytest onnx
+          python -m pip install (Get-ChildItem dist/*.whl).FullName
+          python tests/integration/test_sdk.py build/fixtures
+          New-Item -ItemType Directory test-feed | Out-Null
+          Copy-Item dist/*.nupkg test-feed
+          dotnet restore sdk/csharp/Cureco.Inference.Tests/Cureco.Inference.Tests.csproj -r win-x64 --configfile .github/nuget-test.config
+          dotnet build sdk/csharp/Cureco.Inference.Tests/Cureco.Inference.Tests.csproj -c Release -r win-x64 --no-restore
+          dotnet sdk/csharp/Cureco.Inference.Tests/bin/Release/net8.0/win-x64/Cureco.Inference.Tests.dll build/fixtures/classification.onnx
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-testnuget-package
+          path: dist/*.nupkg
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: testnuget-fixture
+          path: build/fixtures/classification.onnx
+          if-no-files-found: error
+
+  publish-test:
+    needs: verify
+    if: ${{ !inputs.verify_only }}
+    runs-on: ubuntu-latest
+    environment:
+      name: testnuget
+      url: https://int.nugettest.org/packages/Cureco.Inference.Core
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: verified-testnuget-package
+          path: dist
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{ vars.TESTNUGET_USER }}
+          token-service-url: https://int.nugettest.org/api/v2/token
+          audience: https://int.nugettest.org
+      - name: Publish to TestNuGet only
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+        run: dotnet nuget push dist/*.nupkg --api-key "$NUGET_API_KEY" --source https://apiint.nugettest.org/v3/index.json
+
+  install-from-testnuget:
+    needs: publish-test
+    runs-on: windows-2022
+    timeout-minutes: 15
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.event.release.tag_name }}
+      NUGET_PACKAGES: ${{ github.workspace }}/fresh-packages
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - uses: actions/download-artifact@v4
+        with:
+          name: testnuget-fixture
+          path: fixture
+      - name: Download exact package from TestNuGet
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = $env:RELEASE_TAG.Substring(1)
+          $index = Invoke-RestMethod https://apiint.nugettest.org/v3/index.json
+          $base = ($index.resources | Where-Object { $_.'@type' -eq 'PackageBaseAddress/3.0.0' }).'@id'
+          if (!$base -or ([uri]$base).Host -notlike '*.nugettest.org') { throw 'Expected TestNuGet package endpoint' }
+          New-Item -ItemType Directory test-feed | Out-Null
+          for ($attempt = 0; $attempt -lt 20; $attempt++) {
+            try {
+              Invoke-WebRequest "${base}cureco.inference.core/$version/cureco.inference.core.$version.nupkg" -OutFile "test-feed/Cureco.Inference.Core.$version.nupkg"
+              break
+            } catch {
+              if ($attempt -eq 19) { throw }
+              Start-Sleep -Seconds 30
+            }
+          }
+      - name: Install and test downloaded package
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $project = 'sdk/csharp/Cureco.Inference.Tests/Cureco.Inference.Tests.csproj'
+          dotnet restore $project -r win-x64 --no-cache --configfile .github/nuget-test.config
+          dotnet build $project -c Release -r win-x64 --no-restore
+          dotnet sdk/csharp/Cureco.Inference.Tests/bin/Release/net8.0/win-x64/Cureco.Inference.Tests.dll fixture/classification.onnx
