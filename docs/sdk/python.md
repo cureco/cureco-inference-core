@@ -1,10 +1,10 @@
 # Python
 
-Python 3.10以降。対象OSの配布wheelにネイティブランタイムが含まれます。
-以下はローカル配布物を使用する例です。
+Python 3.10以降・Windows x64。PyPIからインストールできます。
+ネイティブランタイムはパッケージに含まれます。
 
 ```sh
-python -m pip install ./cureco_inference_core-0.2.0-py3-none-win_amd64.whl
+python -m pip install --upgrade cureco-inference-core
 python examples/python/minimal/infer.py model.onnx image.png
 ```
 

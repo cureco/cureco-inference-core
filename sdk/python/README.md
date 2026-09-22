@@ -3,6 +3,12 @@
 Thin Python bindings to the shared native inference SDK.
 Platform wheels include the native runtime and its license notices; Python ONNX Runtime is not required.
 
+Install on Windows x64 with Python 3.10 or later:
+
+```sh
+python -m pip install --upgrade cureco-inference-core
+```
+
 ```python
 from PIL import Image
 from cureco_inference_core import CurecoInference
