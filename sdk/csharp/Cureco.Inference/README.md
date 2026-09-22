@@ -1,4 +1,4 @@
-# Cureco.Inference
+# Cureco.Inference.Core
 
 C# bindings to the shared native inference SDK. This package is not a second inference engine.
 Use a package containing the native runtime for your target RID (initial validation: win-x64).

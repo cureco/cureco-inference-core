@@ -33,8 +33,6 @@ jobs:
         shell: pwsh
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.tag || github.event.release.tag_name }}
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
@@ -47,8 +45,8 @@ jobs:
           if ($env:RELEASE_TAG -notmatch '^v\d+\.\d+\.\d+$') { throw 'Expected stable version tag' }
           $release = gh release view $env:RELEASE_TAG --json isDraft,isPrerelease | ConvertFrom-Json
           if ($release.isDraft -or $release.isPrerelease) { throw 'Expected published stable release' }
-          gh release download $env:RELEASE_TAG --pattern 'Cureco.Inference.*.nupkg' --pattern '*-py3-none-win_amd64.whl' --pattern SHA256SUMS.txt --dir dist
-      - name: Verify hashes, metadata and bundled runtime
+          gh release download $env:RELEASE_TAG --pattern 'NativeSDK-win-x64.zip' --pattern '*-py3-none-win_amd64.whl' --pattern SHA256SUMS.txt --dir dist
+      - name: Verify build inputs
         run: |
           @'
           import hashlib
@@ -58,15 +56,34 @@ jobs:
           import zipfile
           checksums = dict(line.split(maxsplit=1)[::-1] for line in Path('dist/SHA256SUMS.txt').read_text().splitlines() if line.strip())
           checksums = {name.lstrip('*'): digest for name, digest in checksums.items()}
-          packages = list(Path('dist').glob('*.nupkg'))
+          packages = list(Path('dist').glob('NativeSDK-win-x64.zip'))
           wheels = list(Path('dist').glob('*.whl'))
           assert len(packages) == len(wheels) == 1
           for path in packages + wheels:
               assert hashlib.sha256(path.read_bytes()).hexdigest() == checksums[path.name], path.name
+          root = ET.parse('sdk/csharp/Cureco.Inference/Cureco.Inference.csproj').getroot()
+          assert root.find('.//Version').text == os.environ['RELEASE_TAG'][1:]
+          assert root.find('.//PackageId').text == 'Cureco.Inference.Core'
+          print('Verified build inputs')
+          '@ | python -
+      - name: Build renamed NuGet package
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          Expand-Archive dist/NativeSDK-win-x64.zip build/native-sdk
+          dotnet pack sdk/csharp/Cureco.Inference/Cureco.Inference.csproj -c Release -o dist -p:RuntimeIdentifier=win-x64 "-p:CurecoNativeRuntimeDir=$pwd/build/native-sdk/bin"
+      - name: Verify packaged identity and runtime
+        run: |
+          @'
+          import os
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          import zipfile
+          packages = list(Path('dist').glob('*.nupkg'))
+          assert len(packages) == 1
           with zipfile.ZipFile(packages[0]) as archive:
               names = archive.namelist()
               root = ET.fromstring(archive.read(next(n for n in names if n.endswith('.nuspec'))))
-              assert root.find('.//{*}metadata/{*}id').text == 'Cureco.Inference'
+              assert root.find('.//{*}metadata/{*}id').text == 'Cureco.Inference.Core'
               assert root.find('.//{*}metadata/{*}version').text == os.environ['RELEASE_TAG'][1:]
               for name in ('lib/net8.0/Cureco.Inference.dll', 'runtimes/win-x64/native/cureco_inference.dll', 'runtimes/win-x64/native/onnxruntime.dll', 'licenses/cureco-LICENSE', 'licenses/onnxruntime-LICENSE', 'licenses/onnxruntime-ThirdPartyNotices.txt', 'licenses/nlohmann-json-LICENSE.MIT'):
                   assert name in names, name
@@ -97,7 +114,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: nuget
-      url: https://www.nuget.org/packages/Cureco.Inference
+      url: https://www.nuget.org/packages/Cureco.Inference.Core
     permissions:
       id-token: write
     steps:
@@ -132,8 +149,6 @@ jobs:
         shell: pwsh
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.tag || github.event.release.tag_name }}
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'

@@ -6,12 +6,12 @@
     <Version>0.2.0</Version>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Cureco.Inference" Version="0.2.0" GeneratePathProperty="true" />
+    <PackageReference Include="Cureco.Inference.Core" Version="0.2.0" GeneratePathProperty="true" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" GeneratePathProperty="true" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
   <Target Name="CopyRuntimeNotices" AfterTargets="Publish">
-    <ItemGroup><RuntimeNotice Include="$(PkgCureco_Inference)/licenses/*" /></ItemGroup>
+    <ItemGroup><RuntimeNotice Include="$(PkgCureco_Inference_Core)/licenses/*" /></ItemGroup>
     <Error Condition="'@(RuntimeNotice)' == ''" Text="Native runtime license notices are required for distribution." />
     <Copy SourceFiles="@(RuntimeNotice)" DestinationFolder="$(PublishDir)/licenses" />
     <ItemGroup>
