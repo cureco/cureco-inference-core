@@ -1,0 +1,91 @@
+name: Publish Python SDK to PyPI
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing stable release tag (for example v0.2.0)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-pypi
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: github.event_name == 'workflow_dispatch' || !github.event.release.prerelease
+    runs-on: windows-2022
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.event.release.tag_name }}
+      GH_TOKEN: ${{ github.token }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.event.release.tag_name }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download stable release wheel
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          if ($env:RELEASE_TAG -notmatch '^v\d+\.\d+\.\d+$') { throw 'Expected stable version tag' }
+          $release = gh release view $env:RELEASE_TAG --json isDraft,isPrerelease | ConvertFrom-Json
+          if ($release.isDraft -or $release.isPrerelease) { throw 'Expected published stable release' }
+          gh release download $env:RELEASE_TAG --pattern '*-py3-none-win_amd64.whl' --pattern SHA256SUMS.txt --dir dist
+      - name: Verify checksum and package identity
+        run: |
+          @'
+          import email
+          import hashlib
+          import os
+          from pathlib import Path
+          import zipfile
+          wheels = list(Path('dist').glob('*.whl'))
+          assert len(wheels) == 1, 'Expected one Windows x64 wheel'
+          wheel = wheels[0]
+          checksums = dict(line.split(maxsplit=1)[::-1] for line in Path('dist/SHA256SUMS.txt').read_text().splitlines() if line.strip())
+          checksums = {name.lstrip('*'): digest for name, digest in checksums.items()}
+          assert hashlib.sha256(wheel.read_bytes()).hexdigest() == checksums[wheel.name], 'Checksum mismatch'
+          with zipfile.ZipFile(wheel) as archive:
+              metadata = email.message_from_bytes(archive.read(next(n for n in archive.namelist() if n.endswith('.dist-info/METADATA'))))
+              assert metadata['Name'] == 'cureco-inference-core'
+              assert metadata['Version'] == os.environ['RELEASE_TAG'][1:]
+              assert any(n.endswith('/_native/cureco_inference.dll') for n in archive.namelist())
+          print('Verified:', wheel.name)
+          '@ | python -
+      - name: Test the distribution
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          python -m pip install twine pytest onnx
+          python -m twine check --strict dist/*.whl
+          python -m pip install (Get-ChildItem dist/*.whl).FullName
+          python -m pytest tests/integration sdk/python/tests -q
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-pypi-wheel
+          path: dist/*.whl
+          if-no-files-found: error
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/cureco-inference-core/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: verified-pypi-wheel
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
