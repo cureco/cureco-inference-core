@@ -13,6 +13,10 @@ on:
         description: Verify without publishing
         type: boolean
         default: false
+      auth_only:
+        description: Check Trusted Publishing authentication without uploading
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -22,8 +26,21 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  authenticate:
+    if: ${{ inputs.auth_only }}
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python .github/scripts/check_pypi_auth.py pypi
   verify:
-    if: github.event_name == 'workflow_dispatch' || !github.event.release.prerelease
+    if: ${{ !inputs.auth_only && (github.event_name == 'workflow_dispatch' || !github.event.release.prerelease) }}
     runs-on: windows-2022
     env:
       RELEASE_TAG: ${{ inputs.tag || github.event.release.tag_name }}
